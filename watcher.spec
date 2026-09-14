@@ -10,24 +10,12 @@ a = Analysis(
     ["Watcher.py"],
     pathex=[],
     binaries=[
-        (
-            "tesseract/tesseract.exe",
-            "tesseract"
-        ),
-        (
-            "tesseract/*.dll",
-            "tesseract"
-        ),
+        ("tesseract/tesseract.exe", "tesseract"),
+        ("tesseract/*.dll", "tesseract"),
     ],
     datas=[
-        (
-            "tesseract/tessdata",
-            "tesseract/tessdata"
-        ),
-        (
-            "w_logo.png",
-            "."
-        ),
+        ("tesseract/tessdata", "tesseract/tessdata"),
+        ("w_logo.png", "."),
     ],
     hiddenimports=hiddenimports,
     hookspath=[],
@@ -43,13 +31,21 @@ pyz = PYZ(a.pure)
 exe = EXE(
     pyz,
     a.scripts,
-    a.binaries,
-    a.datas,
     [],
+    exclude_binaries=True,
     name="watcher",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
     console=True,
+)
+
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.datas,
+    strip=False,
+    upx=True,
+    name="watcher",
 )
