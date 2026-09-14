@@ -25,7 +25,7 @@ a = Analysis(
             "tesseract/tessdata"
         ),
         (
-            "W_logo.png",
+            "w_logo.png",
             "."
         ),
     ],
