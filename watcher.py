@@ -1,3 +1,4 @@
+import mss
 import os
 import sys
 import time
@@ -9,14 +10,29 @@ import pytesseract
 from PIL import Image
 from mss import mss
 
+
+# ==========================================
+# WATCHER INITIALIZATION
+# ==========================================
+
 print("==========================================")
 print("          WATCHER INITIALIZED")
 print("==========================================")
+
+
+# ==========================================
+# FIND WATCHER'S FOLDER
+# ==========================================
 
 if getattr(sys, "frozen", False):
     BASE_DIR = os.path.dirname(sys.executable)
 else:
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
+# ==========================================
+# START / LIZARD SOUND
+# ==========================================
 
 START_SOUND_PATHS = [
     os.path.join(
@@ -42,12 +58,17 @@ for path in START_SOUND_PATHS:
 
 if START_SOUND_PATH:
 
-    print("[+] Start sound found")
+    print("[+] Lizard sound found")
     print(f"    Path: {START_SOUND_PATH}")
 
 else:
 
-    print("[-] Start sound not found")
+    print("[-] Lizard sound not found")
+
+
+# ==========================================
+# TESSERACT OCR
+# ==========================================
 
 TESSERACT_PATHS = [
     os.path.join(
@@ -89,6 +110,11 @@ else:
 
         print(f"    {path}")
 
+
+# ==========================================
+# TARGET ITEMS
+# ==========================================
+
 ETERNAL_ITEMS = [
     "Oni Tiger",
     "Ice Dragon",
@@ -116,6 +142,10 @@ TARGETS = {
 }
 
 
+# ==========================================
+# FIND TARGET
+# ==========================================
+
 def find_target(text):
 
     text_lower = text.lower()
@@ -136,6 +166,10 @@ def find_target(text):
 
     return None, None
 
+
+# ==========================================
+# SCANNER CONTROL
+# ==========================================
 
 scanning = threading.Event()
 running = True
@@ -185,9 +219,14 @@ def quit_program():
     running = False
     scanning.clear()
 
+
+# ==========================================
+# SCANNER
+# ==========================================
+
 def scan_screen():
 
-    with mss() as sct:
+    with mss.MSS() as sct:
 
         monitor = sct.monitors[1]
 
@@ -207,6 +246,14 @@ def scan_screen():
                 continue
 
             try:
+
+                # Play lizard sound for every scan
+                if START_SOUND_PATH:
+
+                    winsound.PlaySound(
+                        START_SOUND_PATH,
+                        winsound.SND_FILENAME | winsound.SND_ASYNC
+                    )
 
                 screenshot = sct.grab(crop_box)
 
@@ -237,6 +284,10 @@ def scan_screen():
                 time.sleep(2)
 
 
+# ==========================================
+# KEYBINDS
+# ==========================================
+
 keyboard.add_hotkey(
     "=",
     start_scanning
@@ -258,12 +309,22 @@ print("    =  START")
 print("    -  STOP")
 print("    Q  QUIT")
 
+
+# ==========================================
+# START SCANNER THREAD
+# ==========================================
+
 scanner_thread = threading.Thread(
     target=scan_screen,
     daemon=True
 )
 
 scanner_thread.start()
+
+
+# ==========================================
+# KEEP WATCHER RUNNING
+# ==========================================
 
 try:
 
