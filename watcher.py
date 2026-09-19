@@ -3,6 +3,7 @@ import os
 import sys
 import time
 import threading
+import subprocess
 import winsound
 
 import keyboard
@@ -28,6 +29,108 @@ if getattr(sys, "frozen", False):
     BASE_DIR = os.path.dirname(sys.executable)
 else:
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
+# ==========================================
+# C++ WATCHER CORE
+# ==========================================
+
+if sys.platform.startswith("win"):
+    CORE_NAME = "watcher2_core.exe"
+else:
+    CORE_NAME = "watcher2_core"
+
+CORE_PATH = os.path.join(
+    BASE_DIR,
+    CORE_NAME
+)
+
+CORE_PROCESS = None
+
+
+def start_cpp_core():
+
+    global CORE_PROCESS
+
+    if not os.path.exists(CORE_PATH):
+
+        print("[-] C++ Watcher core not found")
+        print(f"    Expected: {CORE_PATH}")
+
+        return
+
+    try:
+
+        print("[+] Starting C++ Watcher core...")
+
+        CORE_PROCESS = subprocess.Popen(
+            [CORE_PATH],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1
+        )
+
+        print("[+] C++ Watcher core started")
+
+        threading.Thread(
+            target=read_cpp_output,
+            daemon=True
+        ).start()
+
+    except Exception as error:
+
+        print(
+            f"[-] Failed to start C++ core: {error}"
+        )
+
+
+def read_cpp_output():
+
+    if CORE_PROCESS is None:
+        return
+
+    try:
+
+        for line in CORE_PROCESS.stdout:
+
+            line = line.strip()
+
+            if line:
+
+                print(
+                    f"[C++] {line}"
+                )
+
+    except Exception as error:
+
+        print(
+            f"[-] C++ output error: {error}"
+        )
+
+
+def stop_cpp_core():
+
+    global CORE_PROCESS
+
+    if CORE_PROCESS is None:
+        return
+
+    if CORE_PROCESS.poll() is None:
+
+        print("[+] Stopping C++ Watcher core...")
+
+        CORE_PROCESS.terminate()
+
+        try:
+
+            CORE_PROCESS.wait(timeout=3)
+
+        except subprocess.TimeoutExpired:
+
+            CORE_PROCESS.kill()
+
+    CORE_PROCESS = None
 
 
 # ==========================================
@@ -219,6 +322,8 @@ def quit_program():
     running = False
     scanning.clear()
 
+    stop_cpp_core()
+
 
 # ==========================================
 # SCANNER
@@ -311,6 +416,13 @@ print("    Q  QUIT")
 
 
 # ==========================================
+# START C++ CORE
+# ==========================================
+
+start_cpp_core()
+
+
+# ==========================================
 # START SCANNER THREAD
 # ==========================================
 
@@ -341,5 +453,7 @@ finally:
     scanning.clear()
 
     keyboard.unhook_all()
+
+    stop_cpp_core()
 
     print("[+] Watcher stopped.")
