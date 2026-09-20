@@ -30,6 +30,35 @@ else:
 
 
 # ==========================================
+# DISCORD WEBHOOK
+# ==========================================
+# NEVER put the actual webhook URL here.
+#
+# Public-safe:
+# Watcher reads the URL from the
+# WATCHER_WEBHOOK_URL environment variable.
+#
+# Example:
+#
+# WATCHER_WEBHOOK_URL="your_private_webhook_here"
+#
+# Keep the real URL outside GitHub.
+
+WEBHOOK_URL = os.environ.get(
+    "WATCHER_WEBHOOK_URL",
+    ""
+)
+
+if WEBHOOK_URL:
+
+    print("[+] Discord webhook configured")
+
+else:
+
+    print("[-] Discord webhook not configured")
+
+
+# ==========================================
 # PLATFORM
 # ==========================================
 
@@ -38,12 +67,15 @@ IS_LINUX = sys.platform.startswith("linux")
 
 
 if IS_WINDOWS:
+
     print("[+] Platform: Windows")
 
 elif IS_LINUX:
+
     print("[+] Platform: Linux")
 
 else:
+
     print(f"[+] Platform: {sys.platform}")
 
 
@@ -101,9 +133,11 @@ def play_start_sound():
 
         elif IS_LINUX:
 
-            # Try PulseAudio / PipeWire first.
             result = subprocess.run(
-                ["paplay", START_SOUND_PATH],
+                [
+                    "paplay",
+                    START_SOUND_PATH
+                ],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL
             )
@@ -111,7 +145,11 @@ def play_start_sound():
             if result.returncode != 0:
 
                 subprocess.run(
-                    ["aplay", "-q", START_SOUND_PATH],
+                    [
+                        "aplay",
+                        "-q",
+                        START_SOUND_PATH
+                    ],
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL
                 )
@@ -336,10 +374,18 @@ def scan_screen():
         monitor = sct.monitors[1]
 
         crop_box = {
-            "top": int(monitor["height"] * 0.3),
-            "left": int(monitor["width"] * 0.3),
-            "width": int(monitor["width"] * 0.4),
-            "height": int(monitor["height"] * 0.4)
+            "top": int(
+                monitor["height"] * 0.3
+            ),
+            "left": int(
+                monitor["width"] * 0.3
+            ),
+            "width": int(
+                monitor["width"] * 0.4
+            ),
+            "height": int(
+                monitor["height"] * 0.4
+            )
         }
 
         while running:
@@ -351,8 +397,6 @@ def scan_screen():
                 continue
 
             try:
-
-                play_start_sound()
 
                 screenshot = sct.grab(
                     crop_box
