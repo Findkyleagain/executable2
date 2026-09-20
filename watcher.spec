@@ -1,11 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
 
-from PyInstaller.utils.hooks import collect_submodules
-
-
-hiddenimports = collect_submodules("pytesseract")
-
-
 a = Analysis(
     ["Watcher.py"],
     pathex=[],
@@ -14,16 +8,23 @@ a = Analysis(
         ("tesseract/*.dll", "tesseract"),
     ],
     datas=[
-        ("tesseract/tessdata", "tesseract/tessdata"),
+        ("tesseract/tessdata/eng.traineddata", "tesseract/tessdata"),
         ("w_logo.png", "."),
+        ("start_sound.wav", "."),
     ],
-    hiddenimports=hiddenimports,
+    hiddenimports=[],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=[
+        "tkinter",
+        "numpy",
+        "pandas",
+        "matplotlib",
+        "scipy",
+    ],
     noarchive=False,
-    optimize=0,
+    optimize=2,
 )
 
 pyz = PYZ(a.pure)
@@ -31,21 +32,13 @@ pyz = PYZ(a.pure)
 exe = EXE(
     pyz,
     a.scripts,
+    a.binaries,
+    a.datas,
     [],
-    exclude_binaries=True,
     name="watcher",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
     console=True,
-)
-
-coll = COLLECT(
-    exe,
-    a.binaries,
-    a.datas,
-    strip=False,
-    upx=True,
-    name="watcher",
 )
