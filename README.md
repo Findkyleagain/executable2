@@ -1,2 +1,2 @@
 # executable2
-fk my life
+A Roblox Steal An Egg; egg notifier. Use it overnight.
