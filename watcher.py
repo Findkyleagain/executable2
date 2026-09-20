@@ -4,12 +4,10 @@ import sys
 import time
 import threading
 import subprocess
-import winsound
 
 import keyboard
 import pytesseract
 from PIL import Image
-from mss import mss
 
 
 # ==========================================
@@ -32,109 +30,25 @@ else:
 
 
 # ==========================================
-# C++ WATCHER CORE
+# PLATFORM
 # ==========================================
 
-if sys.platform.startswith("win"):
-    CORE_NAME = "watcher2_core.exe"
+IS_WINDOWS = sys.platform.startswith("win")
+IS_LINUX = sys.platform.startswith("linux")
+
+
+if IS_WINDOWS:
+    print("[+] Platform: Windows")
+
+elif IS_LINUX:
+    print("[+] Platform: Linux")
+
 else:
-    CORE_NAME = "watcher2_core"
-
-CORE_PATH = os.path.join(
-    BASE_DIR,
-    CORE_NAME
-)
-
-CORE_PROCESS = None
-
-
-def start_cpp_core():
-
-    global CORE_PROCESS
-
-    if not os.path.exists(CORE_PATH):
-
-        print("[-] C++ Watcher core not found")
-        print(f"    Expected: {CORE_PATH}")
-
-        return
-
-    try:
-
-        print("[+] Starting C++ Watcher core...")
-
-        CORE_PROCESS = subprocess.Popen(
-            [CORE_PATH],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            bufsize=1
-        )
-
-        print("[+] C++ Watcher core started")
-
-        threading.Thread(
-            target=read_cpp_output,
-            daemon=True
-        ).start()
-
-    except Exception as error:
-
-        print(
-            f"[-] Failed to start C++ core: {error}"
-        )
-
-
-def read_cpp_output():
-
-    if CORE_PROCESS is None:
-        return
-
-    try:
-
-        for line in CORE_PROCESS.stdout:
-
-            line = line.strip()
-
-            if line:
-
-                print(
-                    f"[C++] {line}"
-                )
-
-    except Exception as error:
-
-        print(
-            f"[-] C++ output error: {error}"
-        )
-
-
-def stop_cpp_core():
-
-    global CORE_PROCESS
-
-    if CORE_PROCESS is None:
-        return
-
-    if CORE_PROCESS.poll() is None:
-
-        print("[+] Stopping C++ Watcher core...")
-
-        CORE_PROCESS.terminate()
-
-        try:
-
-            CORE_PROCESS.wait(timeout=3)
-
-        except subprocess.TimeoutExpired:
-
-            CORE_PROCESS.kill()
-
-    CORE_PROCESS = None
+    print(f"[+] Platform: {sys.platform}")
 
 
 # ==========================================
-# START / LIZARD SOUND
+# AUDIO
 # ==========================================
 
 START_SOUND_PATHS = [
@@ -169,23 +83,122 @@ else:
     print("[-] Lizard sound not found")
 
 
+def play_start_sound():
+
+    if not START_SOUND_PATH:
+        return
+
+    try:
+
+        if IS_WINDOWS:
+
+            import winsound
+
+            winsound.PlaySound(
+                START_SOUND_PATH,
+                winsound.SND_FILENAME | winsound.SND_ASYNC
+            )
+
+        elif IS_LINUX:
+
+            # Try PulseAudio / PipeWire first.
+            result = subprocess.run(
+                ["paplay", START_SOUND_PATH],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
+
+            if result.returncode != 0:
+
+                subprocess.run(
+                    ["aplay", "-q", START_SOUND_PATH],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL
+                )
+
+    except Exception as error:
+
+        print(
+            f"[-] Audio error: {error}"
+        )
+
+
+def play_stop_sound():
+
+    try:
+
+        if IS_WINDOWS:
+
+            import winsound
+
+            winsound.Beep(
+                500,
+                150
+            )
+
+        elif IS_LINUX:
+
+            print("[+] Scanner stopped")
+
+    except Exception as error:
+
+        print(
+            f"[-] Stop sound error: {error}"
+        )
+
+
+def play_quit_sound():
+
+    try:
+
+        if IS_WINDOWS:
+
+            import winsound
+
+            winsound.Beep(
+                300,
+                250
+            )
+
+        elif IS_LINUX:
+
+            print("[+] Watcher shutting down")
+
+    except Exception as error:
+
+        print(
+            f"[-] Quit sound error: {error}"
+        )
+
+
 # ==========================================
 # TESSERACT OCR
 # ==========================================
 
-TESSERACT_PATHS = [
-    os.path.join(
-        BASE_DIR,
-        "_internal",
-        "tesseract",
-        "tesseract.exe"
-    ),
-    os.path.join(
-        BASE_DIR,
-        "tesseract",
-        "tesseract.exe"
-    )
-]
+if IS_WINDOWS:
+
+    TESSERACT_PATHS = [
+        os.path.join(
+            BASE_DIR,
+            "_internal",
+            "tesseract",
+            "tesseract.exe"
+        ),
+        os.path.join(
+            BASE_DIR,
+            "tesseract",
+            "tesseract.exe"
+        ),
+        r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+    ]
+
+else:
+
+    TESSERACT_PATHS = [
+        "/usr/bin/tesseract",
+        "/usr/local/bin/tesseract"
+    ]
+
 
 TESSERACT_PATH = None
 
@@ -286,12 +299,7 @@ def start_scanning():
 
         print("[+] Scanner started")
 
-        if START_SOUND_PATH:
-
-            winsound.PlaySound(
-                START_SOUND_PATH,
-                winsound.SND_FILENAME | winsound.SND_ASYNC
-            )
+        play_start_sound()
 
 
 def stop_scanning():
@@ -302,10 +310,7 @@ def stop_scanning():
 
         print("[-] Scanner stopped")
 
-        winsound.Beep(
-            500,
-            150
-        )
+        play_stop_sound()
 
 
 def quit_program():
@@ -314,15 +319,10 @@ def quit_program():
 
     print("[+] Watcher shutting down...")
 
-    winsound.Beep(
-        300,
-        250
-    )
+    play_quit_sound()
 
     running = False
     scanning.clear()
-
-    stop_cpp_core()
 
 
 # ==========================================
@@ -352,15 +352,11 @@ def scan_screen():
 
             try:
 
-                # Play lizard sound for every scan
-                if START_SOUND_PATH:
+                play_start_sound()
 
-                    winsound.PlaySound(
-                        START_SOUND_PATH,
-                        winsound.SND_FILENAME | winsound.SND_ASYNC
-                    )
-
-                screenshot = sct.grab(crop_box)
+                screenshot = sct.grab(
+                    crop_box
+                )
 
                 img = Image.frombytes(
                     "RGB",
@@ -368,9 +364,13 @@ def scan_screen():
                     screenshot.rgb
                 )
 
-                text = pytesseract.image_to_string(img)
+                text = pytesseract.image_to_string(
+                    img
+                )
 
-                rarity, item = find_target(text)
+                rarity, item = find_target(
+                    text
+                )
 
                 if rarity and item:
 
@@ -416,13 +416,6 @@ print("    Q  QUIT")
 
 
 # ==========================================
-# START C++ CORE
-# ==========================================
-
-start_cpp_core()
-
-
-# ==========================================
 # START SCANNER THREAD
 # ==========================================
 
@@ -453,7 +446,5 @@ finally:
     scanning.clear()
 
     keyboard.unhook_all()
-
-    stop_cpp_core()
 
     print("[+] Watcher stopped.")
