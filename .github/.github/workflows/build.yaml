@@ -9,162 +9,83 @@ jobs:
     runs-on: windows-latest
 
     steps:
-
-      # ==========================================
-      # CHECKOUT
-      # ==========================================
-
       - name: Checkout repository
         uses: actions/checkout@v4
-
-
-      # ==========================================
-      # PYTHON
-      # ==========================================
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-
-      # ==========================================
-      # PYTHON DEPENDENCIES
-      # ==========================================
-
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
           pip install pytesseract mss pillow keyboard pyinstaller
-
-
-      # ==========================================
-      # TESSERACT
-      # ==========================================
 
       - name: Install Tesseract OCR
         shell: powershell
         run: |
           choco install tesseract -y
 
-
-      # ==========================================
-      # PREPARE SMALL TESSERACT PACKAGE
-      # ==========================================
-
       - name: Prepare Tesseract files
         shell: powershell
         run: |
+          New-Item -ItemType Directory -Force -Path "tesseract"
+          New-Item -ItemType Directory -Force -Path "tesseract\tessdata"
 
-          New-Item `
-            -ItemType Directory `
-            -Force `
-            -Path "tesseract"
-
-          New-Item `
-            -ItemType Directory `
-            -Force `
-            -Path "tesseract\tessdata"
-
-
-          # Tesseract executable
-
-          Copy-Item `
-            "C:\Program Files\Tesseract-OCR\tesseract.exe" `
-            "tesseract\tesseract.exe"
-
-
-          # Required Tesseract DLLs
-
-          Copy-Item `
-            "C:\Program Files\Tesseract-OCR\*.dll" `
-            "tesseract\"
-
-
-          # English OCR data ONLY
-
-          Copy-Item `
-            "C:\Program Files\Tesseract-OCR\tessdata\eng.traineddata" `
-            "tesseract\tessdata\eng.traineddata"
-
-
-      # ==========================================
-      # VERIFY TESSERACT
-      # ==========================================
+          Copy-Item "C:\Program Files\Tesseract-OCR\tesseract.exe" "tesseract\tesseract.exe"
+          Copy-Item "C:\Program Files\Tesseract-OCR\*.dll" "tesseract\"
+          Copy-Item "C:\Program Files\Tesseract-OCR\tessdata\eng.traineddata" "tesseract\tessdata\eng.traineddata"
 
       - name: Test Tesseract
         shell: powershell
         run: |
-
-          & "tesseract\tesseract.exe" `
-            --version
-
+          & "tesseract\tesseract.exe" --version
 
           if (-not (Test-Path "tesseract\tessdata\eng.traineddata")) {
               Write-Error "English Tesseract data was not found."
               exit 1
           }
 
-
-      # ==========================================
-      # TEST PYTHON IMPORTS
-      # ==========================================
-
       - name: Test Watcher imports
         shell: powershell
         run: |
-
           python -c "import mss; import pytesseract; import PIL; import keyboard; print('Watcher dependencies OK')"
-
-
-      # ==========================================
-      # BUILD
-      # ==========================================
 
       - name: Build Watcher
         run: |
           pyinstaller --clean watcher.spec
 
-
-      # ==========================================
-      # VERIFY BUILD
-      # ==========================================
-
-      - name: Verify Watcher build
+      - name: Verify build
         shell: powershell
         run: |
+          Write-Host ""
+          Write-Host "=========================================="
+          Write-Host "        WATCHER BUILD OUTPUT"
+          Write-Host "=========================================="
+          Write-Host ""
 
-          if (-not (Test-Path "dist\watcher\watcher.exe")) {
-              Write-Error "watcher.exe was not created."
+          if (Test-Path "dist") {
+              Get-ChildItem "dist" -Recurse -Force
+
+              Write-Host ""
+              Write-Host "Build size:"
+
+              $size = (
+                  Get-ChildItem "dist" -Recurse -File |
+                  Measure-Object -Property Length -Sum
+              ).Sum
+
+              Write-Host "$([math]::Round($size / 1MB, 2)) MB"
+          }
+          else {
+              Write-Error "dist folder was not created."
               exit 1
           }
-
-          Write-Host ""
-          Write-Host "Watcher executable found:"
-          Get-Item "dist\watcher\watcher.exe"
-
-
-          Write-Host ""
-          Write-Host "Build size:"
-          $size = (
-              Get-ChildItem `
-                "dist\watcher" `
-                -Recurse `
-                -File |
-              Measure-Object `
-                -Property Length `
-                -Sum
-          ).Sum
-
-          Write-Host "$([math]::Round($size / 1MB, 2)) MB"
-
-
-      # ==========================================
-      # UPLOAD
-      # ==========================================
 
       - name: Upload Watcher
         uses: actions/upload-artifact@v4
         with:
           name: watcher-build
-          path: dist/watcher/
+          path: dist/**
+          if-no-files-found: error
