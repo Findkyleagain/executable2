@@ -4,6 +4,7 @@ import sys
 import time
 import threading
 import subprocess
+import requests
 
 import keyboard
 import pytesseract
@@ -30,32 +31,15 @@ else:
 
 
 # ==========================================
-# DISCORD WEBHOOK
+# CLOUDFLARE WORKER
 # ==========================================
-# NEVER put the actual webhook URL here.
-#
-# Public-safe:
-# Watcher reads the URL from the
-# WATCHER_WEBHOOK_URL environment variable.
-#
-# Example:
-#
-# WATCHER_WEBHOOK_URL="your_private_webhook_here"
-#
-# Keep the real URL outside GitHub.
 
-WEBHOOK_URL = os.environ.get(
-    "WATCHER_WEBHOOK_URL",
-    ""
+WORKER_URL = (
+    "https://floral-fire-333b.jsmith0420.workers.dev/"
 )
 
-if WEBHOOK_URL:
-
-    print("[+] Discord webhook configured")
-
-else:
-
-    print("[-] Discord webhook not configured")
+print("[+] Cloudflare Worker configured")
+print(f"    URL: {WORKER_URL}")
 
 
 # ==========================================
@@ -322,11 +306,62 @@ def find_target(text):
 
 
 # ==========================================
+# SEND DISCORD ALERT THROUGH CLOUDFLARE
+# ==========================================
+
+def send_alert(rarity, item):
+
+    message = (
+        f"🚨 {rarity} detected!\n"
+        f"**{item}**"
+    )
+
+    payload = {
+        "message": message
+    }
+
+    try:
+
+        response = requests.post(
+            WORKER_URL,
+            json=payload,
+            timeout=10
+        )
+
+        if response.ok:
+
+            print(
+                "[+] Discord alert sent successfully"
+            )
+
+        else:
+
+            print(
+                "[-] Cloudflare returned "
+                f"HTTP {response.status_code}"
+            )
+
+            print(
+                f"    Response: {response.text}"
+            )
+
+    except requests.RequestException as error:
+
+        print(
+            f"[-] Alert request failed: {error}"
+        )
+
+
+# ==========================================
 # SCANNER CONTROL
 # ==========================================
 
 scanning = threading.Event()
 running = True
+
+# Prevent the same visible target from
+# triggering an alert every scan cycle.
+last_detected_target = None
 
 
 def start_scanning():
@@ -368,6 +403,8 @@ def quit_program():
 # ==========================================
 
 def scan_screen():
+
+    global last_detected_target
 
     with mss.MSS() as sct:
 
@@ -418,9 +455,34 @@ def scan_screen():
 
                 if rarity and item:
 
+                    current_target = (
+                        rarity,
+                        item
+                    )
+
                     print(
                         f"[!!!] {rarity} {item} detected!"
                     )
+
+                    # Only alert when this target was
+                    # not already detected.
+                    if current_target != last_detected_target:
+
+                        send_alert(
+                            rarity,
+                            item
+                        )
+
+                        last_detected_target = (
+                            current_target
+                        )
+
+                else:
+
+                    # Target disappeared from the screen.
+                    # The next appearance can trigger
+                    # another notification.
+                    last_detected_target = None
 
                 time.sleep(2)
 
