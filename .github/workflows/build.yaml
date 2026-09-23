@@ -34,22 +34,15 @@ jobs:
           $destination = "tesseract"
 
           New-Item -ItemType Directory -Force -Path $destination
+          New-Item -ItemType Directory -Force -Path "$destination\tessdata"
 
           Copy-Item `
             "$source\tesseract.exe" `
             "$destination\tesseract.exe" `
             -Force
 
-          Get-ChildItem `
-            "$source\*.dll" |
-          Copy-Item `
-            -Destination $destination `
-            -Force
-
-          New-Item `
-            -ItemType Directory `
-            -Force `
-            -Path "$destination\tessdata"
+          Get-ChildItem "$source\*.dll" |
+            Copy-Item -Destination $destination -Force
 
           Copy-Item `
             "$source\tessdata\eng.traineddata" `
@@ -108,9 +101,17 @@ jobs:
 
           Write-Host "$([math]::Round($size / 1MB, 2)) MB"
 
-      - name: Upload Watcher
+      - name: Create Watcher ZIP
+        shell: powershell
+        run: |
+          Compress-Archive `
+            -Path "dist\*" `
+            -DestinationPath "watcher-build.zip" `
+            -Force
+
+      - name: Upload Watcher ZIP
         uses: actions/upload-artifact@v4
         with:
           name: watcher-build
-          path: dist/**
+          path: watcher-build.zip
           if-no-files-found: error
