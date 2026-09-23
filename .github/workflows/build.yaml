@@ -20,7 +20,7 @@ jobs:
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install pytesseract mss pillow keyboard pyinstaller
+          python -m pip install pytesseract mss pillow keyboard requests pyinstaller
 
       - name: Install Tesseract OCR
         shell: powershell
@@ -30,20 +30,31 @@ jobs:
       - name: Prepare Tesseract
         shell: powershell
         run: |
-          New-Item -ItemType Directory -Force -Path "tesseract"
-          New-Item -ItemType Directory -Force -Path "tesseract\tessdata"
+          $source = "C:\Program Files\Tesseract-OCR"
+          $destination = "tesseract"
+
+          New-Item -ItemType Directory -Force -Path $destination
 
           Copy-Item `
-            "C:\Program Files\Tesseract-OCR\tesseract.exe" `
-            "tesseract\tesseract.exe"
+            "$source\tesseract.exe" `
+            "$destination\tesseract.exe" `
+            -Force
+
+          Get-ChildItem `
+            "$source\*.dll" |
+          Copy-Item `
+            -Destination $destination `
+            -Force
+
+          New-Item `
+            -ItemType Directory `
+            -Force `
+            -Path "$destination\tessdata"
 
           Copy-Item `
-            "C:\Program Files\Tesseract-OCR\*.dll" `
-            "tesseract\"
-
-          Copy-Item `
-            "C:\Program Files\Tesseract-OCR\tessdata\eng.traineddata" `
-            "tesseract\tessdata\eng.traineddata"
+            "$source\tessdata\eng.traineddata" `
+            "$destination\tessdata\eng.traineddata" `
+            -Force
 
       - name: Test Tesseract
         shell: powershell
@@ -58,7 +69,7 @@ jobs:
       - name: Test Python dependencies
         shell: powershell
         run: |
-          python -c "import mss; import pytesseract; import PIL; import keyboard; print('Watcher dependencies OK')"
+          python -c "import mss; import pytesseract; import PIL; import keyboard; import requests; print('Watcher dependencies OK')"
 
       - name: Build Watcher
         shell: powershell
