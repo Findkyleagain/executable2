@@ -18,13 +18,17 @@ print("==========================================")
 
 # FIND WATCHER'S FOLDER
 if getattr(sys, "frozen", False):
-    BASE_DIR = os.path.dirname(os.path.abspath(sys.executable))
+    # PyInstaller one-file extraction directory
+    BASE_DIR = sys._MEIPASS
+    EXE_DIR = os.path.dirname(os.path.abspath(sys.executable))
 else:
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    EXE_DIR = BASE_DIR
 
 
 # CLOUDFLARE WORKER
 WORKER_URL = "https://floral-fire-333b.jsmith0420.workers.dev/"
+
 print("[+] Cloudflare Worker configured")
 print(f"    URL: {WORKER_URL}")
 
@@ -44,7 +48,9 @@ else:
 # AUDIO
 START_SOUND_PATHS = [
     os.path.join(BASE_DIR, "start_sound.wav"),
-    os.path.join(BASE_DIR, "_internal", "start_sound.wav")
+    os.path.join(EXE_DIR, "start_sound.wav"),
+    os.path.join(BASE_DIR, "_internal", "start_sound.wav"),
+    os.path.join(EXE_DIR, "_internal", "start_sound.wav")
 ]
 
 START_SOUND_PATH = None
@@ -127,17 +133,29 @@ if IS_WINDOWS:
     TESSERACT_PATHS = [
         os.path.join(
             BASE_DIR,
-            "_internal",
+            "tesseract",
+            "tesseract.exe"
+        ),
+        os.path.join(
+            EXE_DIR,
             "tesseract",
             "tesseract.exe"
         ),
         os.path.join(
             BASE_DIR,
+            "_internal",
+            "tesseract",
+            "tesseract.exe"
+        ),
+        os.path.join(
+            EXE_DIR,
+            "_internal",
             "tesseract",
             "tesseract.exe"
         ),
         r"C:\Program Files\Tesseract-OCR\tesseract.exe"
     ]
+
 else:
     TESSERACT_PATHS = [
         "/usr/bin/tesseract",
@@ -148,18 +166,36 @@ else:
 TESSERACT_PATH = None
 
 for path in TESSERACT_PATHS:
-    if os.path.exists(path):
+    if os.path.isfile(path):
         TESSERACT_PATH = path
         break
 
 
 if TESSERACT_PATH:
+
     pytesseract.pytesseract.tesseract_cmd = TESSERACT_PATH
+
+    # Tell Tesseract where its language data is.
+    tesseract_directory = os.path.dirname(
+        TESSERACT_PATH
+    )
+
+    tessdata_directory = os.path.join(
+        tesseract_directory,
+        "tessdata"
+    )
+
+    if os.path.isdir(tessdata_directory):
+        os.environ["TESSDATA_PREFIX"] = tessdata_directory
+
+        print("[+] Tesseract language data found")
+        print(f"    Path: {tessdata_directory}")
 
     print("[+] Tesseract found")
     print(f"    Path: {TESSERACT_PATH}")
 
 else:
+
     print("[-] Tesseract not found")
     print("    Checked:")
 
@@ -200,12 +236,14 @@ def find_target(text):
     text_lower = text.lower()
 
     for rarity, items in TARGETS.items():
+
         rarity_lower = rarity.lower()
 
         if rarity_lower not in text_lower:
             continue
 
         for item in items:
+
             if item.lower() in text_lower:
                 return rarity, item
 
@@ -214,6 +252,7 @@ def find_target(text):
 
 # SEND DISCORD ALERT THROUGH CLOUDFLARE
 def send_alert(rarity, item):
+
     message = (
         f"🚨 {rarity} detected!\n"
         f"**{item}**"
@@ -224,6 +263,7 @@ def send_alert(rarity, item):
     }
 
     try:
+
         response = requests.post(
             WORKER_URL,
             json=payload,
@@ -231,16 +271,27 @@ def send_alert(rarity, item):
         )
 
         if response.ok:
-            print("[+] Discord alert sent successfully")
+
+            print(
+                "[+] Discord alert sent successfully"
+            )
+
         else:
+
             print(
                 "[-] Cloudflare returned "
                 f"HTTP {response.status_code}"
             )
-            print(f"    Response: {response.text}")
+
+            print(
+                f"    Response: {response.text}"
+            )
 
     except requests.RequestException as error:
-        print(f"[-] Alert request failed: {error}")
+
+        print(
+            f"[-] Alert request failed: {error}"
+        )
 
 
 # SCANNER CONTROL
@@ -250,7 +301,9 @@ last_detected_target = None
 
 
 def start_scanning():
+
     if not scanning.is_set():
+
         scanning.set()
 
         print("[+] Scanner started")
@@ -259,7 +312,9 @@ def start_scanning():
 
 
 def stop_scanning():
+
     if scanning.is_set():
+
         scanning.clear()
 
         print("[-] Scanner stopped")
@@ -268,6 +323,7 @@ def stop_scanning():
 
 
 def quit_program():
+
     global running
 
     print("[+] Watcher shutting down...")
@@ -280,32 +336,50 @@ def quit_program():
 
 # SCANNER
 def scan_screen():
+
     global last_detected_target
 
     try:
+
         with mss.MSS() as sct:
 
             if len(sct.monitors) < 2:
-                print("[-] No display monitor available")
+
+                print(
+                    "[-] No display monitor available"
+                )
+
                 return
 
             monitor = sct.monitors[1]
 
             crop_box = {
-                "top": int(monitor["height"] * 0.3),
-                "left": int(monitor["width"] * 0.3),
-                "width": int(monitor["width"] * 0.4),
-                "height": int(monitor["height"] * 0.4)
+                "top": int(
+                    monitor["height"] * 0.3
+                ),
+                "left": int(
+                    monitor["width"] * 0.3
+                ),
+                "width": int(
+                    monitor["width"] * 0.4
+                ),
+                "height": int(
+                    monitor["height"] * 0.4
+                )
             }
 
             while running:
 
                 if not scanning.is_set():
+
                     time.sleep(0.1)
                     continue
 
                 try:
-                    screenshot = sct.grab(crop_box)
+
+                    screenshot = sct.grab(
+                        crop_box
+                    )
 
                     img = Image.frombytes(
                         "RGB",
@@ -313,9 +387,13 @@ def scan_screen():
                         screenshot.rgb
                     )
 
-                    text = pytesseract.image_to_string(img)
+                    text = pytesseract.image_to_string(
+                        img
+                    )
 
-                    rarity, item = find_target(text)
+                    rarity, item = find_target(
+                        text
+                    )
 
                     if rarity and item:
 
@@ -325,10 +403,15 @@ def scan_screen():
                         )
 
                         print(
-                            f"[!!!] {rarity} {item} detected!"
+                            f"[!!!] {rarity} "
+                            f"{item} detected!"
                         )
 
-                        if current_target != last_detected_target:
+                        if (
+                            current_target
+                            != last_detected_target
+                        ):
+
                             send_alert(
                                 rarity,
                                 item
@@ -339,21 +422,25 @@ def scan_screen():
                             )
 
                     else:
+
                         last_detected_target = None
 
                     time.sleep(2)
 
                 except Exception as error:
+
                     print(
-                        f"[-] Error in scan loop: {error}"
+                        "[-] Error in scan loop: "
+                        f"{error}"
                     )
 
                     time.sleep(2)
 
     except Exception as error:
+
         print(
-            "[-] Screen capture initialization failed: "
-            f"{error}"
+            "[-] Screen capture initialization "
+            f"failed: {error}"
         )
 
 
@@ -362,11 +449,9 @@ def scan_screen():
 # ==========================================================
 
 def setup_windows_keyboard():
-    """
-    Windows uses the keyboard package for global hotkeys.
-    """
 
     try:
+
         import keyboard
 
         keyboard.add_hotkey(
@@ -392,21 +477,16 @@ def setup_windows_keyboard():
         return keyboard
 
     except Exception as error:
+
         print(
-            "[-] Windows global hotkeys unavailable: "
-            f"{error}"
+            "[-] Windows global hotkeys "
+            f"unavailable: {error}"
         )
 
         return None
 
 
 def terminal_keyboard_loop():
-    """
-    Linux fallback.
-
-    Reads keys directly from the terminal without
-    requiring sudo or special keyboard permissions.
-    """
 
     global running
 
@@ -414,13 +494,23 @@ def terminal_keyboard_loop():
     import tty
 
     if not sys.stdin.isatty():
-        print("[-] Linux terminal input is unavailable")
+
+        print(
+            "[-] Linux terminal input "
+            "is unavailable"
+        )
+
         return
 
-    old_settings = termios.tcgetattr(sys.stdin)
+    old_settings = termios.tcgetattr(
+        sys.stdin
+    )
 
     try:
-        tty.setcbreak(sys.stdin.fileno())
+
+        tty.setcbreak(
+            sys.stdin.fileno()
+        )
 
         print()
         print("[+] Terminal controls enabled")
@@ -430,46 +520,51 @@ def terminal_keyboard_loop():
         print()
 
         while running:
+
             key = sys.stdin.read(1)
 
             if key == "=":
+
                 start_scanning()
 
             elif key == "-":
+
                 stop_scanning()
 
             elif key.lower() == "q":
+
                 quit_program()
 
     except Exception as error:
+
         print(
-            f"[-] Terminal keyboard error: {error}"
+            f"[-] Terminal keyboard error: "
+            f"{error}"
         )
 
     finally:
+
         try:
+
             termios.tcsetattr(
                 sys.stdin,
                 termios.TCSADRAIN,
                 old_settings
             )
+
         except Exception:
             pass
 
 
 def setup_linux_keyboard():
-    """
-    Linux attempts global keyboard controls first.
-
-    If the keyboard package cannot access global
-    keyboard input, Watcher automatically falls
-    back to terminal controls.
-    """
 
     try:
+
         import keyboard
 
-        print("[+] Attempting Linux global hotkeys...")
+        print(
+            "[+] Attempting Linux global hotkeys..."
+        )
 
         keyboard.add_hotkey(
             "=",
@@ -486,7 +581,10 @@ def setup_linux_keyboard():
             quit_program
         )
 
-        print("[+] Linux global hotkeys enabled")
+        print(
+            "[+] Linux global hotkeys enabled"
+        )
+
         print("    =  START")
         print("    -  STOP")
         print("    Q  QUIT")
@@ -494,8 +592,10 @@ def setup_linux_keyboard():
         return keyboard, False
 
     except Exception as error:
+
         print(
-            "[-] Linux global hotkeys unavailable"
+            "[-] Linux global hotkeys "
+            "unavailable"
         )
 
         print(
@@ -503,7 +603,8 @@ def setup_linux_keyboard():
         )
 
         print(
-            "[+] Falling back to terminal controls"
+            "[+] Falling back to "
+            "terminal controls"
         )
 
         return None, True
@@ -516,22 +617,36 @@ def setup_linux_keyboard():
 keyboard_module = None
 terminal_mode = False
 
+
 if IS_WINDOWS:
 
-    keyboard_module = setup_windows_keyboard()
+    keyboard_module = (
+        setup_windows_keyboard()
+    )
 
     if keyboard_module is None:
-        print("[-] Watcher cannot start keyboard controls")
+
+        print(
+            "[-] Watcher cannot start "
+            "keyboard controls"
+        )
+
         running = False
+
 
 elif IS_LINUX:
 
-    keyboard_module, terminal_mode = setup_linux_keyboard()
+    (
+        keyboard_module,
+        terminal_mode
+    ) = setup_linux_keyboard()
+
 
 else:
 
     print(
-        "[-] Unsupported platform for keyboard controls"
+        "[-] Unsupported platform "
+        "for keyboard controls"
     )
 
     running = False
@@ -564,6 +679,7 @@ try:
     else:
 
         while running:
+
             time.sleep(1)
 
 except KeyboardInterrupt:
@@ -579,8 +695,11 @@ finally:
     if keyboard_module is not None:
 
         try:
+
             keyboard_module.unhook_all()
+
         except Exception:
+
             pass
 
     print("[+] Watcher stopped.")
